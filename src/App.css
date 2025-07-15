@@ -36,3 +36,41 @@
     transform: rotate(360deg);
   }
 }
+
+body {
+  background-image: url('https://images.unsplash.com/photo-1745990653134-2a9fc31fcd5c?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHx0b3BpYy1mZWVkfDIxNnw2c01WalRMU2tlUXx8ZW58MHx8fHx8');
+  background-size: cover;
+  background-position: center;
+  min-height: 100vh;
+  margin: 0;
+}
+
+.tree-icon {
+  animation: growFade 0.5s ease-in-out;
+}
+
+@keyframes growFade {
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.tree-grow {
+  animation: grow 2s ease-out forwards;
+}
+
+@keyframes grow {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}

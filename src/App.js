@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import './App.css';
 import {
   Connection,
@@ -16,6 +16,7 @@ import {
   WalletMultiButton,
 } from '@solana/wallet-adapter-react-ui';
 import { PhantomWalletAdapter } from '@solana/wallet-adapter-wallets';
+import { supabase } from './supabaseClient';
 
 require('@solana/wallet-adapter-react-ui/styles.css');
 
@@ -25,6 +26,45 @@ const AppContent = () => {
   const wallet = useWallet();
   const [treeCount, setTreeCount] = useState(0);
   const [message, setMessage] = useState('');
+
+  // ✅ DEBUG: Log your Supabase env variables
+  console.log('Supabase URL:', process.env.REACT_APP_SUPABASE_URL);
+  console.log('Supabase Key:', process.env.REACT_APP_SUPABASE_ANON_KEY);
+
+  // ✅ Fetch tree count from Supabase
+  const fetchTreeCount = async () => {
+    const { data, error } = await supabase
+      .from('trees')
+      .select('count')
+      .eq('id', 1)
+      .single();
+
+    if (error) {
+      console.error('Error fetching tree count:', error);
+    } else {
+      setTreeCount(data.count);
+    }
+  };
+
+  // ✅ Update tree count in Supabase WITH LOG
+  const updateTreeCount = async (newCount) => {
+    console.log('Updating tree count to:', newCount);
+    const { error } = await supabase
+      .from('trees')
+      .update({ count: newCount })
+      .eq('id', 1);
+
+    if (error) {
+      console.error('Error updating tree count:', error);
+    }
+  };
+
+  // ✅ Load tree count on wallet connect
+  useEffect(() => {
+    if (wallet.connected) {
+      fetchTreeCount();
+    }
+  }, [wallet.connected]);
 
   const plantTree = useCallback(async () => {
     if (!wallet.connected || !wallet.publicKey) {
@@ -46,7 +86,12 @@ const AppContent = () => {
       const signature = await wallet.sendTransaction(tx, connection);
       await connection.confirmTransaction(signature, 'confirmed');
 
-      setTreeCount((prev) => prev + 1);
+      setTreeCount((prev) => {
+        const newCount = prev + 1;
+        updateTreeCount(newCount);
+        return newCount;
+      });
+
       setMessage(`🌳 Tree Planted! Total: ${treeCount + 1}`);
     } catch (error) {
       console.error('Transaction failed:', error);
@@ -70,11 +115,12 @@ const AppContent = () => {
             maxWidth: 400,
             marginLeft: 'auto',
             marginRight: 'auto',
+            background: 'rgba(255, 255, 255, 0.8)',
           }}
         >
           <h3>🌳 Mission: Plant Trees</h3>
           <p>
-            Each tree you plant is tracked on-chain.
+            Each tree you plant is tracked on-chain + stored in your database!
             <br />
             Connected wallet:
             <br />
@@ -83,13 +129,8 @@ const AppContent = () => {
             </code>
           </p>
           <h4>Progress</h4>
-          <p>
-            Trees Planted: <strong>{treeCount}</strong>
-          </p>
-          <p>
-            Planter Level:{' '}
-            <strong>{Math.floor(treeCount / 5) + 1}</strong>
-          </p>
+          <p>Trees Planted: <strong>{treeCount}</strong></p>
+          <p>Planter Level: <strong>{Math.floor(treeCount / 5) + 1}</strong></p>
 
           <button
             onClick={plantTree}
