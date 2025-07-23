@@ -26,43 +26,70 @@ const AppContent = () => {
   const wallet = useWallet();
   const [treeCount, setTreeCount] = useState(0);
   const [message, setMessage] = useState('');
+  const [leaderboard, setLeaderboard] = useState([]);
 
-  // ✅ DEBUG: Log your Supabase env variables
+  // DEBUG
   console.log('Supabase URL:', process.env.REACT_APP_SUPABASE_URL);
   console.log('Supabase Key:', process.env.REACT_APP_SUPABASE_ANON_KEY);
 
-  // ✅ Fetch tree count from Supabase
+  // Fetch your own tree count
   const fetchTreeCount = async () => {
+    if (!wallet.publicKey) return;
+
     const { data, error } = await supabase
       .from('trees')
       .select('count')
-      .eq('id', 1)
+      .eq('wallet', wallet.publicKey.toBase58())
       .single();
 
-    if (error) {
+    if (error && error.code !== 'PGRST116') {
       console.error('Error fetching tree count:', error);
-    } else {
+    } else if (data) {
       setTreeCount(data.count);
+    } else {
+      // If no record, insert one
+      await supabase
+        .from('trees')
+        .insert([{ wallet: wallet.publicKey.toBase58(), count: 0 }]);
+      setTreeCount(0);
     }
   };
 
-  // ✅ Update tree count in Supabase WITH LOG
+  // Update your own tree count
   const updateTreeCount = async (newCount) => {
-    console.log('Updating tree count to:', newCount);
+    if (!wallet.publicKey) return;
+
     const { error } = await supabase
       .from('trees')
-      .update({ count: newCount })
-      .eq('id', 1);
+      .upsert({
+        wallet: wallet.publicKey.toBase58(),
+        count: newCount,
+      });
 
     if (error) {
       console.error('Error updating tree count:', error);
     }
   };
 
-  // ✅ Load tree count on wallet connect
+  // Fetch leaderboard
+  const fetchLeaderboard = async () => {
+    const { data, error } = await supabase
+      .from('trees')
+      .select('wallet, count')
+      .order('count', { ascending: false })
+      .limit(10);
+
+    if (error) {
+      console.error('Error fetching leaderboard:', error);
+    } else {
+      setLeaderboard(data);
+    }
+  };
+
   useEffect(() => {
     if (wallet.connected) {
       fetchTreeCount();
+      fetchLeaderboard();
     }
   }, [wallet.connected]);
 
@@ -78,8 +105,8 @@ const AppContent = () => {
       const tx = new Transaction().add(
         SystemProgram.transfer({
           fromPubkey: wallet.publicKey,
-          toPubkey: wallet.publicKey, // sending to self (dummy tx)
-          lamports: 1, // minimal tx to make a verifiable signature
+          toPubkey: wallet.publicKey,
+          lamports: 1,
         })
       );
 
@@ -89,6 +116,7 @@ const AppContent = () => {
       setTreeCount((prev) => {
         const newCount = prev + 1;
         updateTreeCount(newCount);
+        fetchLeaderboard();
         return newCount;
       });
 
@@ -112,7 +140,7 @@ const AppContent = () => {
             padding: 20,
             border: '2px solid #4CAF50',
             borderRadius: 12,
-            maxWidth: 400,
+            maxWidth: 500,
             marginLeft: 'auto',
             marginRight: 'auto',
             background: 'rgba(255, 255, 255, 0.8)',
@@ -128,7 +156,8 @@ const AppContent = () => {
               {wallet.publicKey.toBase58()}
             </code>
           </p>
-          <h4>Progress</h4>
+
+          <h4>Your Progress</h4>
           <p>Trees Planted: <strong>{treeCount}</strong></p>
           <p>Planter Level: <strong>{Math.floor(treeCount / 5) + 1}</strong></p>
 
@@ -148,6 +177,15 @@ const AppContent = () => {
             Plant a Tree
           </button>
           <p>{message}</p>
+
+          <h4>🏆 Leaderboard</h4>
+          <ol style={{ textAlign: 'left', maxWidth: 400, margin: '0 auto' }}>
+            {leaderboard.map((entry, index) => (
+              <li key={index}>
+                {entry.wallet.slice(0, 4)}...{entry.wallet.slice(-4)} — {entry.count} trees
+              </li>
+            ))}
+          </ol>
         </div>
       )}
 
